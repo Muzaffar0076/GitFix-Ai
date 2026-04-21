@@ -1,0 +1,46 @@
+# ── Secrets (NEVER push these) ────────────────────────────────────────────────
+.env                      # Your real API keys — keep this LOCAL only
+*.pem                     # Private keys
+*.key
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.cover
+
+# ── Virtual Environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── GitFix AI — App Data ──────────────────────────────────────────────────────
+cloned_repos/             # Repos cloned by the agent (can be huge)
+chroma_store/             # ChromaDB vector embeddings (generated, not source)
+
+# ── Node / React (Frontend) ───────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/build/
+.DS_Store
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+*.log
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
