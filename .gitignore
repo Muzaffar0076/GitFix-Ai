@@ -28,6 +28,7 @@ ENV/
 
 # ── GitFix AI — App Data ──────────────────────────────────────────────────────
 cloned_repos/             # Repos cloned by the agent (can be huge)
+backend/cloned_repos/     # Also cover when launched from root
 chroma_store/             # ChromaDB vector embeddings (generated, not source)
 
 # ── Node / React (Frontend) ───────────────────────────────────────────────────
@@ -44,3 +45,4 @@ frontend/build/
 .idea/
 *.swp
 *.swo
+backend/cloned_repos/
