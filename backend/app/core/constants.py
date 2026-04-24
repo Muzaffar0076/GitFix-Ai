@@ -14,6 +14,8 @@ CHUNK_SIZE = 60              # Number of lines per code chunk sent to ChromaDB
 CHUNK_OVERLAP = 10           # Lines shared between consecutive chunks
                              # (overlap helps preserve context at boundaries)
 TOP_K_RESULTS = 5            # How many relevant code chunks to retrieve per query
+MIN_SIMILARITY_SCORE = 0.3   # Chunks below this similarity score are discarded
+                             # (0.0 = no match, 1.0 = identical)
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
 MAX_LLM_TOKENS = 8192        # Max tokens Claude can return in one response
