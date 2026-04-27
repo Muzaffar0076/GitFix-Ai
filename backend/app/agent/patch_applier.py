@@ -188,6 +188,7 @@ def apply_patch(patch: PatchModel, repo_path: str) -> PatchModel:
     # We create a new PatchModel so the original is not mutated
     return PatchModel(
         file_path=patch.file_path,
+        original_code=original_content,
         patched_code=patch.patched_code,
         diff=diff,
     )

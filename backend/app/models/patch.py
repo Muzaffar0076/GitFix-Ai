@@ -21,8 +21,8 @@ class PatchModel(BaseModel):
     file_path: str          # Relative path to the file being fixed
                             # e.g. "src/auth/login.py"
 
-    original_code: str      # The original file content (before the fix)
-                            # We store this so we can show a diff later
+    original_code: str = "" # The original file content (before the fix)
+                            # This is filled after reading from disk in patch_applier.py
 
     patched_code: str       # The full file content after Claude's fix
                             # We write this directly to disk

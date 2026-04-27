@@ -31,15 +31,18 @@ class LogLevel(str, Enum):
 
 class AgentStage(str, Enum):
     """
-    The 6 stages of the GitFix AI pipeline.
+    All stages of the GitFix AI pipeline.
     The frontend uses these to drive the progress stepper UI.
     """
-    CLONING = "CLONING"         # Fetching issue + cloning repo
-    ANALYZING = "ANALYZING"     # Running RAG pipeline
-    FIXING = "FIXING"           # LLM generating the patch
-    TESTING = "TESTING"         # Docker sandbox running tests
-    RETRYING = "RETRYING"       # Self-healing: sending errors back to Claude
-    RESOLVING = "RESOLVING"     # Creating branch, committing, opening PR
+    PARSING        = "PARSING"        # Parsing the GitHub issue URL
+    FETCHING_ISSUE = "FETCHING_ISSUE" # Fetching issue from GitHub API
+    CLONING        = "CLONING"        # Cloning the repository
+    EMBEDDING      = "EMBEDDING"      # Chunking + embedding into ChromaDB
+    RETRIEVING     = "RETRIEVING"     # Semantic search for relevant code
+    GENERATING     = "GENERATING"     # LLM generating the patch
+    APPLYING_PATCH = "APPLYING_PATCH" # Writing fix to disk
+    CREATING_PR    = "CREATING_PR"    # Opening Pull Request on GitHub
+    FAILED         = "FAILED"         # Pipeline failed at some stage
 
 
 class EventLog(BaseModel):
@@ -52,7 +55,9 @@ class EventLog(BaseModel):
 
     level: LogLevel = LogLevel.INFO
 
-    stage: AgentStage           # Which pipeline stage produced this event
+    stage: AgentStage               # Which pipeline stage produced this event
 
-    message: str                # Human-readable log message
-                                # e.g. "Cloned repo owner/repo in 3.2s"
+    message: str                    # Human-readable log message
+
+    data: dict = Field(default_factory=dict)
+    # Optional extra data (pr_url, chunk_count, etc.)

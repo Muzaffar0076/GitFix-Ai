@@ -16,6 +16,8 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from app.models.event_log import EventLog
+from app.models.issue import IssueModel
+from app.models.patch import PatchModel
 
 
 class RunStatus(str, Enum):
@@ -47,12 +49,21 @@ class RunLog(BaseModel):
 
     status: RunStatus = RunStatus.PENDING
 
-    events: list[EventLog] = []
+    events: list[EventLog] = Field(default_factory=list)
     # All log events emitted during this run, in order
+
+    issue: Optional[IssueModel] = None
+    # Populated once issue metadata is fetched from GitHub.
+
+    patch: Optional[PatchModel] = None
+    # Populated after the LLM generates/applies a fix.
 
     pr_url: Optional[str] = None
     # Set when the agent successfully creates a Pull Request
     # e.g. "https://github.com/owner/repo/pull/5"
+
+    error: Optional[str] = None
+    # Human-readable error message if the run fails.
 
     attempts: int = 0
     # How many LLM+Docker retry cycles were attempted (max = MAX_RETRIES)
