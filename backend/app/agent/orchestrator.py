@@ -34,6 +34,8 @@ CONCEPT — RunLog + EventLog:
 
 import traceback
 from datetime import datetime, timezone
+from typing import Callable
+from uuid import uuid4
 
 from app.agent.patch_applier import apply_patch
 from app.core.logger import logger
@@ -58,6 +60,7 @@ def _log_event(
     message: str,
     level: LogLevel = LogLevel.INFO,
     data: dict | None = None,
+    event_callback: Callable[[EventLog], None] | None = None,
 ) -> None:
     """
     Creates an EventLog entry and appends it to the log list.
@@ -78,6 +81,8 @@ def _log_event(
         timestamp=datetime.now(timezone.utc),
     )
     logs.append(event)
+    if event_callback is not None:
+        event_callback(event)
 
     # Mirror to terminal logger
     if level == LogLevel.ERROR:
@@ -90,7 +95,11 @@ def _log_event(
 
 # ── Master Pipeline Function ──────────────────────────────────────────────────
 
-def run_fix_pipeline(issue_url: str) -> RunLog:
+def run_fix_pipeline(
+    issue_url: str,
+    run_id: str | None = None,
+    event_callback: Callable[[EventLog], None] | None = None,
+) -> RunLog:
     """
     Runs the complete GitFix AI pipeline from URL to Pull Request.
 
@@ -114,6 +123,7 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
 
     # Initialize the RunLog — we'll fill in fields as we go
     run = RunLog(
+        run_id=run_id or str(uuid4()),
         issue_url=issue_url,
         status=RunStatus.RUNNING,
         events=logs,
@@ -127,7 +137,9 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
 
     try:
         # ── STEP 1: Parse the GitHub URL ──────────────────────────────────────
-        _log_event(logs, AgentStage.PARSING, f"Parsing issue URL: {issue_url}")
+        _log_event(
+            logs, AgentStage.PARSING, f"Parsing issue URL: {issue_url}", event_callback=event_callback
+        )
 
         owner, repo_name, issue_number = parse_issue_url(issue_url)
 
@@ -135,10 +147,16 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
             logs, AgentStage.PARSING,
             f"Parsed → owner={owner}, repo={repo_name}, issue=#{issue_number}",
             data={"owner": owner, "repo": repo_name, "issue_number": issue_number},
+            event_callback=event_callback,
         )
 
         # ── STEP 2: Fetch Issue from GitHub API ───────────────────────────────
-        _log_event(logs, AgentStage.FETCHING_ISSUE, f"Fetching issue #{issue_number} from GitHub...")
+        _log_event(
+            logs,
+            AgentStage.FETCHING_ISSUE,
+            f"Fetching issue #{issue_number} from GitHub...",
+            event_callback=event_callback,
+        )
 
         issue = fetch_issue_details(owner, repo_name, issue_number)
         run.issue = issue  # Store on RunLog
@@ -147,11 +165,14 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
             logs, AgentStage.FETCHING_ISSUE,
             f"Fetched issue: '{issue.title}'",
             data={"title": issue.title, "labels": issue.labels},
+            event_callback=event_callback,
         )
 
         # ── STEP 3: Clone or Update the Repository ────────────────────────────
         repo_name_safe = f"{owner}_{repo_name}"
-        _log_event(logs, AgentStage.CLONING, f"Cloning/updating {owner}/{repo_name}...")
+        _log_event(
+            logs, AgentStage.CLONING, f"Cloning/updating {owner}/{repo_name}...", event_callback=event_callback
+        )
 
         repo_path = clone_or_pull_repo(owner, repo_name)
 
@@ -159,10 +180,13 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
             logs, AgentStage.CLONING,
             f"Repository ready at: {repo_path}",
             data={"repo_path": repo_path},
+            event_callback=event_callback,
         )
 
         # ── STEP 4: Embed Repository into ChromaDB ────────────────────────────
-        _log_event(logs, AgentStage.EMBEDDING, "Chunking and embedding repository...")
+        _log_event(
+            logs, AgentStage.EMBEDDING, "Chunking and embedding repository...", event_callback=event_callback
+        )
 
         total_chunks = embed_repository(repo_path, repo_name_safe)
 
@@ -170,10 +194,13 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
             logs, AgentStage.EMBEDDING,
             f"Embedded {total_chunks} chunks into ChromaDB.",
             data={"total_chunks": total_chunks},
+            event_callback=event_callback,
         )
 
         # ── STEP 5: Retrieve Relevant Code ────────────────────────────────────
-        _log_event(logs, AgentStage.RETRIEVING, "Searching for relevant code chunks...")
+        _log_event(
+            logs, AgentStage.RETRIEVING, "Searching for relevant code chunks...", event_callback=event_callback
+        )
 
         # Build the search query from issue title + body
         search_query = f"{issue.title}\n\n{issue.body}"
@@ -184,6 +211,7 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
                 logs, AgentStage.RETRIEVING,
                 "No relevant chunks found. The repo may have no supported source files.",
                 level=LogLevel.WARNING,
+                event_callback=event_callback,
             )
             context = "No relevant code found in the repository."
         else:
@@ -196,10 +224,11 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
                     "top_file": relevant_chunks[0].file_path,
                     "top_score": relevant_chunks[0].score,
                 },
+                event_callback=event_callback,
             )
 
         # ── STEP 6: Generate Fix with LLM ─────────────────────────────────────
-        _log_event(logs, AgentStage.GENERATING, "Sending issue and code to LLM...")
+        _log_event(logs, AgentStage.GENERATING, "Sending issue and code to LLM...", event_callback=event_callback)
 
         patch = generate_patch(issue, context)
         run.patch = patch  # Store on RunLog
@@ -208,10 +237,13 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
             logs, AgentStage.GENERATING,
             f"LLM generated fix for file: {patch.file_path}",
             data={"file_path": patch.file_path},
+            event_callback=event_callback,
         )
 
         # ── STEP 7: Apply the Patch ────────────────────────────────────────────
-        _log_event(logs, AgentStage.APPLYING_PATCH, f"Applying patch to {patch.file_path}...")
+        _log_event(
+            logs, AgentStage.APPLYING_PATCH, f"Applying patch to {patch.file_path}...", event_callback=event_callback
+        )
 
         applied_patch = apply_patch(patch, repo_path)
         run.patch = applied_patch  # Update with diff included
@@ -220,10 +252,16 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
             logs, AgentStage.APPLYING_PATCH,
             "Patch applied successfully.",
             data={"diff_preview": applied_patch.diff[:200] if applied_patch.diff else ""},
+            event_callback=event_callback,
         )
 
         # ── STEP 8: Open Pull Request ──────────────────────────────────────────
-        _log_event(logs, AgentStage.CREATING_PR, "Creating branch and opening Pull Request...")
+        _log_event(
+            logs,
+            AgentStage.CREATING_PR,
+            "Creating branch and opening Pull Request...",
+            event_callback=event_callback,
+        )
 
         pr_url = create_fix_pr(repo_path, issue, applied_patch)
         run.pr_url = pr_url  # Store on RunLog
@@ -232,6 +270,7 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
             logs, AgentStage.CREATING_PR,
             f"Pull Request opened: {pr_url}",
             data={"pr_url": pr_url},
+            event_callback=event_callback,
         )
 
         # ── SUCCESS ────────────────────────────────────────────────────────────
@@ -252,6 +291,7 @@ def run_fix_pipeline(issue_url: str) -> RunLog:
             f"Pipeline failed: {error_msg}",
             level=LogLevel.ERROR,
             data={"traceback": tb},
+            event_callback=event_callback,
         )
 
         run.status = RunStatus.FAILED
