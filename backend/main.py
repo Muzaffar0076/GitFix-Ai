@@ -23,6 +23,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.dashboard import router as dashboard_router
 from app.core.config import get_settings
 from app.core.logger import logger
 
@@ -92,6 +93,4 @@ def health_check():
 
 
 # ── Placeholder: Routers will be added here in the next phases ───────────────
-# from app.api.routes import issues, settings
-# app.include_router(issues.router, prefix="/api")
-# app.include_router(settings.router, prefix="/api")
+app.include_router(dashboard_router)
