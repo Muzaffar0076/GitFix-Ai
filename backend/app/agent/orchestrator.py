@@ -37,7 +37,7 @@ from datetime import datetime, timezone
 from typing import Callable
 from uuid import uuid4
 
-from app.agent.patch_applier import apply_patch
+from app.agent.retry_loop import generate_and_apply_with_retries
 from app.core.logger import logger
 from app.github.pr_creator import create_fix_pr
 from app.github.repo_manager import (
@@ -45,7 +45,6 @@ from app.github.repo_manager import (
     fetch_issue_details,
     parse_issue_url,
 )
-from app.llm.client import generate_patch
 from app.models.event_log import AgentStage, EventLog, LogLevel
 from app.models.run_log import RunLog, RunStatus
 from app.rag.embedder import embed_repository
@@ -227,31 +226,32 @@ def run_fix_pipeline(
                 event_callback=event_callback,
             )
 
-        # ── STEP 6: Generate Fix with LLM ─────────────────────────────────────
-        _log_event(logs, AgentStage.GENERATING, "Sending issue and code to LLM...", event_callback=event_callback)
-
-        patch = generate_patch(issue, context)
-        run.patch = patch  # Store on RunLog
-
+        # ── STEP 6 + 7: Generate + Apply with Retry Loop ─────────────────────
         _log_event(
-            logs, AgentStage.GENERATING,
-            f"LLM generated fix for file: {patch.file_path}",
-            data={"file_path": patch.file_path},
+            logs,
+            AgentStage.GENERATING,
+            "Starting patch generation/apply retry loop...",
+            data={"max_retries": 3},
             event_callback=event_callback,
         )
 
-        # ── STEP 7: Apply the Patch ────────────────────────────────────────────
-        _log_event(
-            logs, AgentStage.APPLYING_PATCH, f"Applying patch to {patch.file_path}...", event_callback=event_callback
+        applied_patch, attempts_used = generate_and_apply_with_retries(
+            issue=issue,
+            base_context=context,
+            repo_path=repo_path,
         )
-
-        applied_patch = apply_patch(patch, repo_path)
-        run.patch = applied_patch  # Update with diff included
+        run.patch = applied_patch
+        run.attempts = attempts_used
 
         _log_event(
-            logs, AgentStage.APPLYING_PATCH,
-            "Patch applied successfully.",
-            data={"diff_preview": applied_patch.diff[:200] if applied_patch.diff else ""},
+            logs,
+            AgentStage.APPLYING_PATCH,
+            f"Patch applied successfully on attempt {attempts_used}.",
+            data={
+                "attempts_used": attempts_used,
+                "file_path": applied_patch.file_path,
+                "diff_preview": applied_patch.diff[:200] if applied_patch.diff else "",
+            },
             event_callback=event_callback,
         )
 
