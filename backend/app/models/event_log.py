@@ -41,6 +41,7 @@ class AgentStage(str, Enum):
     RETRIEVING     = "RETRIEVING"     # Semantic search for relevant code
     GENERATING     = "GENERATING"     # LLM generating the patch
     APPLYING_PATCH = "APPLYING_PATCH" # Writing fix to disk
+    TESTING        = "TESTING"        # Running test suite on patched code
     CREATING_PR    = "CREATING_PR"    # Opening Pull Request on GitHub
     FAILED         = "FAILED"         # Pipeline failed at some stage
 

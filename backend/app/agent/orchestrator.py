@@ -49,6 +49,7 @@ from app.models.event_log import AgentStage, EventLog, LogLevel
 from app.models.run_log import RunLog, RunStatus
 from app.rag.embedder import embed_repository
 from app.rag.retriever import format_chunks_for_prompt, retrieve_relevant_chunks
+from app.sandbox.test_executor import execute_test_suite
 
 
 # ── Helper: Log an Event ──────────────────────────────────────────────────────
@@ -255,7 +256,31 @@ def run_fix_pipeline(
             event_callback=event_callback,
         )
 
-        # ── STEP 8: Open Pull Request ──────────────────────────────────────────
+        # ── STEP 8: Run Test Suite ─────────────────────────────────────────────
+        _log_event(
+            logs,
+            AgentStage.TESTING,
+            "Running test suite on patched repository...",
+            event_callback=event_callback,
+        )
+
+        test_result = execute_test_suite(repo_path)
+        if not test_result["passed"]:
+            raise ValueError(
+                "Test suite failed after applying patch "
+                f"(runner={test_result['runner']}, exit_code={test_result['exit_code']}). "
+                f"Logs:\n{test_result['logs'][:2000]}"
+            )
+
+        _log_event(
+            logs,
+            AgentStage.TESTING,
+            f"Tests passed via {test_result['runner']} runner.",
+            data={"runner": test_result["runner"], "exit_code": test_result["exit_code"]},
+            event_callback=event_callback,
+        )
+
+        # ── STEP 9: Open Pull Request ──────────────────────────────────────────
         _log_event(
             logs,
             AgentStage.CREATING_PR,
