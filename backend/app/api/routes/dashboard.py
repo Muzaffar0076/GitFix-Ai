@@ -70,3 +70,15 @@ def get_run_status(run_id: str) -> RunLog:
             detail=f"Run '{run_id}' not found",
         )
     return run
+
+
+@router.get("/runs", response_model=list[RunLog], status_code=status.HTTP_200_OK)
+def list_runs() -> list[RunLog]:
+    """
+    Step-3 API endpoint: list all recorded runs (newest first).
+    """
+    return sorted(
+        RUN_STORE.values(),
+        key=lambda run: run.created_at,
+        reverse=True,
+    )
