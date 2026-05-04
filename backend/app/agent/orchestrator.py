@@ -37,7 +37,7 @@ from datetime import datetime, timezone
 from typing import Callable
 from uuid import uuid4
 
-from app.agent.retry_loop import generate_and_apply_with_retries
+from app.agent.retry_loop import generate_apply_test_with_retries
 from app.core.logger import logger
 from app.github.pr_creator import create_fix_pr
 from app.github.repo_manager import (
@@ -49,7 +49,6 @@ from app.models.event_log import AgentStage, EventLog, LogLevel
 from app.models.run_log import RunLog, RunStatus
 from app.rag.embedder import embed_repository
 from app.rag.retriever import format_chunks_for_prompt, retrieve_relevant_chunks
-from app.sandbox.test_executor import execute_test_suite
 
 
 # ── Helper: Log an Event ──────────────────────────────────────────────────────
@@ -236,7 +235,7 @@ def run_fix_pipeline(
             event_callback=event_callback,
         )
 
-        applied_patch, attempts_used = generate_and_apply_with_retries(
+        applied_patch, attempts_used, test_result = generate_apply_test_with_retries(
             issue=issue,
             base_context=context,
             repo_path=repo_path,
@@ -256,27 +255,15 @@ def run_fix_pipeline(
             event_callback=event_callback,
         )
 
-        # ── STEP 8: Run Test Suite ─────────────────────────────────────────────
         _log_event(
             logs,
             AgentStage.TESTING,
-            "Running test suite on patched repository...",
-            event_callback=event_callback,
-        )
-
-        test_result = execute_test_suite(repo_path)
-        if not test_result["passed"]:
-            raise ValueError(
-                "Test suite failed after applying patch "
-                f"(runner={test_result['runner']}, exit_code={test_result['exit_code']}). "
-                f"Logs:\n{test_result['logs'][:2000]}"
-            )
-
-        _log_event(
-            logs,
-            AgentStage.TESTING,
-            f"Tests passed via {test_result['runner']} runner.",
-            data={"runner": test_result["runner"], "exit_code": test_result["exit_code"]},
+            f"Tests passed via {test_result['runner']} runner on attempt {attempts_used}.",
+            data={
+                "runner": test_result["runner"],
+                "exit_code": test_result["exit_code"],
+                "attempts_used": attempts_used,
+            },
             event_callback=event_callback,
         )
 

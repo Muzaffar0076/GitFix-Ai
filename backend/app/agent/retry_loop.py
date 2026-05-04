@@ -3,19 +3,20 @@ from app.core.constants import MAX_RETRIES
 from app.llm.client import generate_patch
 from app.models.issue import IssueModel
 from app.models.patch import PatchModel
+from app.sandbox.test_executor import execute_test_suite
 
 
-def generate_and_apply_with_retries(
+def generate_apply_test_with_retries(
     issue: IssueModel,
     base_context: str,
     repo_path: str,
     max_retries: int = MAX_RETRIES,
-) -> tuple[PatchModel, int]:
+) -> tuple[PatchModel, int, dict]:
     """
-    Try patch generation + patch application multiple times.
+    Try patch generation + patch application + test execution multiple times.
 
     Returns:
-        (applied_patch, attempts_used)
+        (applied_patch, attempts_used, test_result)
 
     Raises:
         RuntimeError if all attempts fail.
@@ -36,12 +37,23 @@ def generate_and_apply_with_retries(
         try:
             patch = generate_patch(issue, context)
             applied_patch = apply_patch(patch, repo_path)
-            return applied_patch, attempt
+
+            test_result = execute_test_suite(repo_path)
+            if test_result["passed"]:
+                return applied_patch, attempt, test_result
+
+            last_error = (
+                "Test suite failed after applying patch.\n"
+                f"Runner: {test_result['runner']}\n"
+                f"Exit code: {test_result['exit_code']}\n"
+                f"Logs:\n{test_result['logs'][:3000]}"
+            )
+            feedback = last_error
         except Exception as exc:
             last_error = str(exc)
             feedback = last_error
 
     raise RuntimeError(
-        f"Patch generation/application failed after {max_retries} attempts. "
+        f"Patch generation/apply/test failed after {max_retries} attempts. "
         f"Last error: {last_error}"
     )
