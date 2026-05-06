@@ -46,3 +46,4 @@ frontend/build/
 *.swp
 *.swo
 backend/cloned_repos/
+.env
