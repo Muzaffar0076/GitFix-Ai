@@ -9,7 +9,7 @@ Fixing → Testing), it emits an EventLog. These events are:
   2. Broadcast over WebSocket to the React dashboard in real time
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -51,7 +51,7 @@ class EventLog(BaseModel):
     One log line sent to the frontend via WebSocket.
     """
 
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # auto-set to current UTC time when object is created
 
     level: LogLevel = LogLevel.INFO
