@@ -19,6 +19,30 @@ class FixRequest(BaseModel):
     issue_url: HttpUrl
 
 
+async def _run_pipeline_in_background(run_id: str, issue_url: str) -> None:
+    """
+    Execute the fix pipeline asynchronously and stream events to websocket clients.
+    """
+    run = RUN_STORE[run_id]
+    loop = asyncio.get_running_loop()
+
+    def on_event(event: EventLog) -> None:
+        run.events.append(event)
+        log_stream_manager.broadcast_from_thread(loop, run_id, event)
+
+    completed_run = await asyncio.to_thread(
+        run_fix_pipeline,
+        issue_url,
+        run_id,
+        on_event,
+    )
+    RUN_STORE[run_id] = completed_run
+    await log_stream_manager.broadcast_message(
+        run_id,
+        {"type": "run_complete", "run_id": run_id, "status": completed_run.status},
+    )
+
+
 @router.post("/fix", response_model=RunLog, status_code=status.HTTP_200_OK)
 async def start_fix(request: FixRequest) -> RunLog:
     """
@@ -32,23 +56,7 @@ async def start_fix(request: FixRequest) -> RunLog:
             status=RunStatus.RUNNING,
         )
         RUN_STORE[run_id] = run
-        loop = asyncio.get_running_loop()
-
-        def on_event(event: EventLog) -> None:
-            run.events.append(event)
-            log_stream_manager.broadcast_from_thread(loop, run_id, event)
-
-        run = await asyncio.to_thread(
-            run_fix_pipeline,
-            str(request.issue_url),
-            run_id,
-            on_event,
-        )
-        RUN_STORE[run.run_id] = run
-        await log_stream_manager.broadcast_message(
-            run.run_id,
-            {"type": "run_complete", "run_id": run.run_id, "status": run.status},
-        )
+        asyncio.create_task(_run_pipeline_in_background(run_id, str(request.issue_url)))
         return run
     except Exception as exc:
         logger.exception("Failed to run fix pipeline for URL: %s", request.issue_url)
