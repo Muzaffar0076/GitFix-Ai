@@ -8,7 +8,7 @@ It tracks the entire lifecycle: from PENDING → RUNNING → SUCCESS/FAILED.
 This is what the API returns when the frontend polls for status.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 from uuid import uuid4
@@ -68,5 +68,5 @@ class RunLog(BaseModel):
     attempts: int = 0
     # How many LLM+Docker retry cycles were attempted (max = MAX_RETRIES)
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: Optional[datetime] = None
