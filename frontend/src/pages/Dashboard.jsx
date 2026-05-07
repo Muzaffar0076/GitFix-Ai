@@ -36,8 +36,9 @@ export default function Dashboard({ token }) {
       wsRef.current.close();
     }
     setLiveLogs([]);
+    const wsBase = import.meta.env.VITE_WS_URL || "ws://localhost:8000/api/ws";
     const ws = new WebSocket(
-      `ws://localhost:8000/api/ws/runs/${runId}?token=${encodeURIComponent(token)}`
+      `${wsBase}/runs/${runId}?token=${encodeURIComponent(token)}`
     );
     ws.onmessage = (event) => {
       try {
