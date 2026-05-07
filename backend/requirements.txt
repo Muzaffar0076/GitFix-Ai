@@ -25,5 +25,7 @@ httpx==0.27.0             # HTTP client used to test FastAPI endpoints
 
 # ── Database & Security ───────────────────────────────────────────────────────
 sqlalchemy>=2.0.36        # ORM for database interactions (stable on Python 3.14)
+psycopg2-binary>=2.9.9    # PostgreSQL driver
+pgvector>=0.2.5           # pgvector support for SQLAlchemy
 bcrypt>=4.0.1             # Secure password hashing (direct usage)
 python-jose[cryptography]==3.3.0 # JWT token support

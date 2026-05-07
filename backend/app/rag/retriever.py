@@ -73,6 +73,15 @@ class RetrievedChunk:
 
 # ── Core Retrieval Function ────────────────────────────────────────────────────
 
+from sqlalchemy import select
+from chromadb.utils import embedding_functions
+
+from app.core.database import SessionLocal
+from app.models.db_models import CodeChunk
+
+# We still use ChromaDB's default embedding function locally (all-MiniLM-L6-v2)
+_embedding_function = embedding_functions.DefaultEmbeddingFunction()
+
 def retrieve_relevant_chunks(
     query: str,
     repo_name: str,
@@ -80,115 +89,69 @@ def retrieve_relevant_chunks(
     min_score: float = MIN_SIMILARITY_SCORE,
 ) -> list[RetrievedChunk]:
     """
-    Searches ChromaDB for the most relevant code chunks for a given query.
-
-    CONCEPT — ChromaDB .query():
-    collection.query(
-        query_texts=["your query here"],  → auto-embeds this text
-        n_results=10,                     → return top 10 matches
-        include=["documents", "metadatas", "distances"]
-    )
-
-    ChromaDB returns "distances" (not similarities). With cosine distance:
-        distance = 0.0 → identical
-        distance = 1.0 → completely different
-    We convert to similarity: similarity = 1 - distance
-
-    Args:
-        query:     The search query (usually the GitHub issue title + body).
-        repo_name: The ChromaDB collection to search in.
-        top_k:     How many results to return (default from constants.py).
-        min_score: Minimum similarity threshold (chunks below this are filtered).
-
-    Returns:
-        List of RetrievedChunk objects, sorted by relevance (highest first).
-        Returns empty list if the collection doesn't exist yet.
+    Searches Postgres for the most relevant code chunks for a given query using pgvector.
     """
-    settings = get_settings()
-
-    # Connect to ChromaDB
-    client = chromadb.PersistentClient(
-        path=settings.CHROMA_DB_PATH,
-        settings=ChromaSettings(anonymized_telemetry=False),
-    )
-
-    # Check if the collection exists (repo might not be embedded yet)
-    existing_collections = [c.name for c in client.list_collections()]
-    if repo_name not in existing_collections:
-        logger.warning(
-            "Collection '%s' not found in ChromaDB. "
-            "Has the repository been embedded yet?",
-            repo_name,
-        )
+    # 1. Embed the query
+    query_embeddings = _embedding_function([query])
+    if not query_embeddings:
+        logger.warning("Failed to embed query.")
         return []
-
-    collection = client.get_collection(name=repo_name)
-
-    # Check if collection has any documents
-    if collection.count() == 0:
-        logger.warning("Collection '%s' is empty. Nothing to search.", repo_name)
-        return []
-
-    # Limit top_k to what's actually available
-    actual_k = min(top_k, collection.count())
-
-    logger.info(
-        "Searching collection '%s' (%d chunks) for: '%s...'",
-        repo_name,
-        collection.count(),
-        query[:60],  # Only log first 60 chars of query
-    )
-
-    # ── Perform the semantic search ────────────────────────────────────────────
-    results = collection.query(
-        query_texts=[query],       # ChromaDB embeds this automatically
-        n_results=actual_k,
-        include=["documents", "metadatas", "distances"],
-        # documents → the raw code text
-        # metadatas → file_path, start_line, end_line
-        # distances → cosine distance (0.0 = identical, 1.0 = opposite)
-    )
-
-    # ── Parse and Filter Results ───────────────────────────────────────────────
-    # ChromaDB returns nested lists because you can query multiple texts at once.
-    # We only queried one text, so we access index [0] for each.
-    ids        = results["ids"][0]
-    documents  = results["documents"][0]
-    metadatas  = results["metadatas"][0]
-    distances  = results["distances"][0]
+    
+    query_embedding = query_embeddings[0]
 
     retrieved = []
 
-    for chunk_id, content, metadata, distance in zip(ids, documents, metadatas, distances):
-        # Convert cosine distance → similarity score
-        # distance=0.0 → similarity=1.0 (perfect match)
-        # distance=1.0 → similarity=0.0 (no match)
-        similarity = 1.0 - distance
+    with SessionLocal() as db:
+        # Check if we have any chunks for this repo
+        count = db.query(CodeChunk).filter_by(repo_name=repo_name).count()
+        if count == 0:
+            logger.warning("No chunks found for repo '%s'.", repo_name)
+            return []
 
-        # Filter out chunks below the minimum similarity threshold
-        if similarity < min_score:
-            logger.debug(
-                "Skipping chunk '%s' (score=%.3f < min=%.3f)",
-                chunk_id, similarity, min_score,
-            )
-            continue
+        actual_k = min(top_k, count)
+        
+        logger.info(
+            "Searching Postgres CodeChunks '%s' (%d chunks) for: '%s...'",
+            repo_name,
+            count,
+            query[:60],
+        )
 
-        retrieved.append(RetrievedChunk(
-            chunk_id=chunk_id,
-            file_path=metadata.get("file_path", "unknown"),
-            content=content,
-            start_line=int(metadata.get("start_line", 0)),
-            end_line=int(metadata.get("end_line", 0)),
-            score=round(similarity, 4),
-        ))
+        # 2. Perform the semantic search using pgvector cosine_distance
+        # cosine_distance in pgvector works identically to ChromaDB (0=identical, 1=opposite)
+        # We query the distance and the chunk
+        distance_col = CodeChunk.embedding.cosine_distance(query_embedding).label("distance")
+        
+        results = db.execute(
+            select(CodeChunk, distance_col)
+            .filter_by(repo_name=repo_name)
+            .order_by(distance_col)
+            .limit(actual_k)
+        ).all()
 
-    # Sort by score descending (most relevant first)
-    retrieved.sort(key=lambda c: c.score, reverse=True)
+        for chunk, distance in results:
+            similarity = 1.0 - distance
+
+            if similarity < min_score:
+                logger.debug(
+                    "Skipping chunk '%s' (score=%.3f < min=%.3f)",
+                    chunk.chunk_id, similarity, min_score,
+                )
+                continue
+
+            retrieved.append(RetrievedChunk(
+                chunk_id=chunk.chunk_id,
+                file_path=chunk.file_path,
+                content=chunk.content,
+                start_line=chunk.start_line,
+                end_line=chunk.end_line,
+                score=round(similarity, 4),
+            ))
 
     logger.info(
         "Retrieved %d relevant chunks (from %d candidates, min_score=%.2f)",
         len(retrieved),
-        len(ids),
+        actual_k,
         min_score,
     )
 

@@ -9,8 +9,10 @@ settings = get_settings()
 # check_same_thread=False is required ONLY for SQLite
 connect_args = {"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
 
+# For Supabase / PostgreSQL, we might want to configure connection pooling
+# but SQLAlchemy handles basic pooling by default.
 engine = create_engine(
-    settings.DATABASE_URL, 
+    settings.DATABASE_URL.replace("postgres://", "postgresql://"), # SQLAlchemy requires postgresql://
     echo=False, 
     connect_args=connect_args
 )

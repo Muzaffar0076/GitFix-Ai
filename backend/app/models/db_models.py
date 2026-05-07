@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 class Base(DeclarativeBase):
     """
@@ -75,3 +76,21 @@ class EventLog(Base):
     # Relationship to RunLog
     run_id: Mapped[Optional[int]] = mapped_column(ForeignKey("runlog.id"), nullable=True)
     run: Mapped[Optional["RunLog"]] = relationship("RunLog", back_populates="events")
+
+class CodeChunk(Base):
+    """
+    Stores vector embeddings for code chunks using pgvector.
+    Replaces ChromaDB.
+    """
+    __tablename__ = "codechunk"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    repo_name: Mapped[str] = mapped_column(String(255), index=True)
+    chunk_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    content: Mapped[str] = mapped_column(Text)
+    file_path: Mapped[str] = mapped_column(Text)
+    start_line: Mapped[int] = mapped_column(Integer)
+    end_line: Mapped[int] = mapped_column(Integer)
+    
+    # 384 dimensions for all-MiniLM-L6-v2
+    embedding: Mapped[list[float]] = mapped_column(Vector(384))
