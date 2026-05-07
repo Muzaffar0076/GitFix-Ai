@@ -72,7 +72,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
-
+  
+@app.get("/")
+def read_root():
+    return {"status": "GitFix AI Backend is running perfectly! 🚀"}
 
 # ── CORS Middleware ───────────────────────────────────────────────────────────
 # CONCEPT — CORS (Cross-Origin Resource Sharing):
