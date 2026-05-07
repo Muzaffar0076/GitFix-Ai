@@ -61,12 +61,13 @@ input {
 }
 
 button {
-  padding: 10px 14px;
+  padding: 6px 12px;
   border: 0;
   border-radius: 6px;
   background: #0f172a;
   color: #fff;
   cursor: pointer;
+  font-size: 13px;
 }
 
 .secondary-button {
@@ -81,6 +82,9 @@ button {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
 }
 
 .brand {
@@ -226,6 +230,7 @@ button:disabled {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  align-items: flex-start;
 }
 
 .logs {
@@ -244,6 +249,12 @@ button:disabled {
   border-radius: 6px;
   padding: 10px;
   margin-bottom: 8px;
+}
+
+.runs-list {
+  height: 260px; /* Exactly enough for 2 runs */
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .muted {

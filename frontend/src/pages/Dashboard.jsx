@@ -96,29 +96,31 @@ export default function Dashboard({ token }) {
         <div className="card">
           <h3>Runs</h3>
           {runs.length === 0 ? <p className="muted">No runs yet.</p> : null}
-          {runs.slice(0, showAllRuns ? runs.length : 2).map((run) => (
-            <div className="run-item" key={run.run_id}>
-              <div>
-                <strong>{run.status}</strong> · {run.run_id.slice(0, 8)}
+          <div className="runs-list">
+            {(showAllRuns ? runs : runs.slice(0, 2)).map((run) => (
+              <div className="run-item" key={run.run_id}>
+                <div>
+                  <strong>{run.status}</strong> · {run.run_id.slice(0, 8)}
+                </div>
+                <div className="muted">{run.issue_url}</div>
+                <div className="muted">Created: {formatTime(run.created_at)}</div>
+                <div className="row">
+                  <button
+                    onClick={() => {
+                      setActiveRunId(run.run_id);
+                      connectLogs(run.run_id);
+                    }}
+                  >
+                    Watch Logs
+                  </button>
+                </div>
               </div>
-              <div className="muted">{run.issue_url}</div>
-              <div className="muted">Created: {formatTime(run.created_at)}</div>
-              <div className="row" style={{ marginTop: 8 }}>
-                <button
-                  onClick={() => {
-                    setActiveRunId(run.run_id);
-                    connectLogs(run.run_id);
-                  }}
-                >
-                  Watch Logs
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
           {runs.length > 2 && (
             <button 
               className="secondary-button" 
-              style={{ width: "100%", marginTop: 12 }}
+              style={{ width: "100%" }}
               onClick={() => setShowAllRuns(!showAllRuns)}
             >
               {showAllRuns ? "Show Less" : `See More (${runs.length - 2} more)`}
