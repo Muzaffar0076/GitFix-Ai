@@ -1,22 +1,34 @@
 import { useState } from "react";
 
-export default function Login({ onLogin }) {
-  const [username, setUsername] = useState("admin");
+export default function Login({ onLogin, onRegister }) {
+  const [mode, setMode] = useState("login");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const isRegistering = mode === "register";
 
   async function handleSubmit(event) {
     event.preventDefault();
     try {
       setLoading(true);
       setError("");
-      await onLogin(username.trim(), password);
+      if (isRegistering) {
+        await onRegister(username.trim(), password);
+      } else {
+        await onLogin(username.trim(), password);
+      }
     } catch (err) {
-      setError(err.message || "Login failed");
+      setError(err.message || "Authentication failed");
     } finally {
       setLoading(false);
     }
+  }
+
+  function switchMode(nextMode) {
+    setMode(nextMode);
+    setError("");
+    setPassword("");
   }
 
   return (
@@ -30,12 +42,29 @@ export default function Login({ onLogin }) {
           </div>
         </div>
 
+        <div className="auth-tabs">
+          <button
+            type="button"
+            className={mode === "login" ? "active" : ""}
+            onClick={() => switchMode("login")}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            className={mode === "register" ? "active" : ""}
+            onClick={() => switchMode("register")}
+          >
+            Register
+          </button>
+        </div>
+
         <label>
-          Username
+          Email or username
           <input
             value={username}
             onChange={(event) => setUsername(event.target.value)}
-            autoComplete="username"
+            autoComplete={isRegistering ? "email" : "username"}
           />
         </label>
 
@@ -52,7 +81,9 @@ export default function Login({ onLogin }) {
         {error ? <p className="error-text">{error}</p> : null}
 
         <button disabled={loading || !username.trim() || !password}>
-          {loading ? "Signing in..." : "Sign In"}
+          {loading
+            ? isRegistering ? "Creating account..." : "Signing in..."
+            : isRegistering ? "Create Account" : "Sign In"}
         </button>
       </form>
     </main>

@@ -3,7 +3,7 @@ import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
-import { getCurrentUser, login, logout } from "./services/api";
+import { getCurrentUser, login, logout, register } from "./services/api";
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("gitfix_token"));
@@ -34,6 +34,13 @@ export default function App() {
     setUser({ username: session.username });
   }
 
+  async function handleRegister(username, password) {
+    const session = await register(username, password);
+    localStorage.setItem("gitfix_token", session.token);
+    setToken(session.token);
+    setUser({ username: session.username });
+  }
+
   async function handleLogout() {
     if (token) {
       await logout(token).catch(() => {});
@@ -49,7 +56,7 @@ export default function App() {
   }
 
   if (!token) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={handleLogin} onRegister={handleRegister} />;
   }
 
   return (

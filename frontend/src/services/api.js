@@ -4,16 +4,45 @@ function authHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function login(username, password) {
-  const response = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!response.ok) {
-    throw new Error("Invalid username or password");
+async function requestJson(url, options, fallbackMessage) {
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(fallbackMessage(response));
+    }
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("Backend is not running. Start FastAPI on port 8000.");
+    }
+    throw error;
   }
-  return response.json();
+}
+
+export async function login(username, password) {
+  return requestJson(
+    `${API_BASE}/auth/login`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    },
+    () => "Invalid email/username or password",
+  );
+}
+
+export async function register(username, password) {
+  return requestJson(
+    `${API_BASE}/auth/register`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    },
+    (response) => response.status === 409
+      ? "Email/username already registered"
+      : "Registration failed",
+  );
 }
 
 export async function logout(token) {
