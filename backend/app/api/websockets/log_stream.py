@@ -1,8 +1,9 @@
 import asyncio
 from collections import defaultdict
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
+from app.api.routes.auth import is_valid_token
 from app.models.event_log import EventLog
 
 router = APIRouter(tags=["websocket"])
@@ -54,6 +55,10 @@ log_stream_manager = LogStreamManager()
 
 @router.websocket("/api/ws/runs/{run_id}")
 async def run_log_stream(websocket: WebSocket, run_id: str) -> None:
+    if not is_valid_token(websocket.query_params.get("token")):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await log_stream_manager.connect(run_id, websocket)
     try:
         while True:

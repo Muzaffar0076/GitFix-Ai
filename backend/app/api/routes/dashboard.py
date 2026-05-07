@@ -2,9 +2,10 @@ import asyncio
 from uuid import uuid4
 
 from pydantic import BaseModel, HttpUrl
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.agent.orchestrator import run_fix_pipeline
+from app.api.routes.auth import verify_token
 from app.api.websockets.log_stream import log_stream_manager
 from app.core.logger import logger
 from app.models.event_log import EventLog
@@ -44,7 +45,7 @@ async def _run_pipeline_in_background(run_id: str, issue_url: str) -> None:
 
 
 @router.post("/fix", response_model=RunLog, status_code=status.HTTP_200_OK)
-async def start_fix(request: FixRequest) -> RunLog:
+async def start_fix(request: FixRequest, _: str = Depends(verify_token)) -> RunLog:
     """
     Step-1 API entry point: accepts a GitHub issue URL and runs the pipeline.
     """
@@ -67,7 +68,7 @@ async def start_fix(request: FixRequest) -> RunLog:
 
 
 @router.get("/runs/{run_id}", response_model=RunLog, status_code=status.HTTP_200_OK)
-def get_run_status(run_id: str) -> RunLog:
+def get_run_status(run_id: str, _: str = Depends(verify_token)) -> RunLog:
     """
     Step-2 API endpoint: fetch an existing run log by run_id.
     """
@@ -81,7 +82,7 @@ def get_run_status(run_id: str) -> RunLog:
 
 
 @router.get("/runs", response_model=list[RunLog], status_code=status.HTTP_200_OK)
-def list_runs() -> list[RunLog]:
+def list_runs(_: str = Depends(verify_token)) -> list[RunLog]:
     """
     Step-3 API endpoint: list all recorded runs (newest first).
     """

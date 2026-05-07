@@ -1,9 +1,42 @@
 const API_BASE = "http://localhost:8000/api";
 
-export async function startFix(issueUrl) {
-  const response = await fetch(`${API_BASE}/fix`, {
+function authHeaders(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export async function login(username, password) {
+  const response = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!response.ok) {
+    throw new Error("Invalid username or password");
+  }
+  return response.json();
+}
+
+export async function logout(token) {
+  await fetch(`${API_BASE}/auth/logout`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+}
+
+export async function getCurrentUser(token) {
+  const response = await fetch(`${API_BASE}/auth/me`, {
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error("Session expired");
+  }
+  return response.json();
+}
+
+export async function startFix(issueUrl, token) {
+  const response = await fetch(`${API_BASE}/fix`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ issue_url: issueUrl }),
   });
   if (!response.ok) {
@@ -12,8 +45,10 @@ export async function startFix(issueUrl) {
   return response.json();
 }
 
-export async function listRuns() {
-  const response = await fetch(`${API_BASE}/runs`);
+export async function listRuns(token) {
+  const response = await fetch(`${API_BASE}/runs`, {
+    headers: authHeaders(token),
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch runs: ${response.status}`);
   }

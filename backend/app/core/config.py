@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "llama-3.3-70b-versatile"  # Best Groq model for code
     MAX_RETRIES: int = 3
 
+    # ── Dashboard Authentication ─────────────────────────────────────────────
+    AUTH_USERNAME: str = "admin"
+    AUTH_PASSWORD: str = "gitfix123"
+
     # ── Pydantic Config ───────────────────────────────────────────────────────
     model_config = SettingsConfigDict(
         # Look for .env in current dir first, then parent dir.

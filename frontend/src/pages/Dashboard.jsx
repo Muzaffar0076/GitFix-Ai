@@ -6,7 +6,7 @@ function formatTime(value) {
   return new Date(value).toLocaleString();
 }
 
-export default function Dashboard() {
+export default function Dashboard({ token }) {
   const [issueUrl, setIssueUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [runs, setRuns] = useState([]);
@@ -21,7 +21,7 @@ export default function Dashboard() {
   );
 
   async function refreshRuns() {
-    const data = await listRuns();
+    const data = await listRuns(token);
     setRuns(data);
   }
 
@@ -30,7 +30,9 @@ export default function Dashboard() {
       wsRef.current.close();
     }
     setLiveLogs([]);
-    const ws = new WebSocket(`ws://localhost:8000/api/ws/runs/${runId}`);
+    const ws = new WebSocket(
+      `ws://localhost:8000/api/ws/runs/${runId}?token=${encodeURIComponent(token)}`
+    );
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
@@ -51,7 +53,7 @@ export default function Dashboard() {
     try {
       setLoading(true);
       setError("");
-      const run = await startFix(issueUrl.trim());
+      const run = await startFix(issueUrl.trim(), token);
       setActiveRunId(run.run_id);
       connectLogs(run.run_id);
       await refreshRuns();
@@ -68,7 +70,7 @@ export default function Dashboard() {
     return () => {
       if (wsRef.current) wsRef.current.close();
     };
-  }, []);
+  }, [token]);
 
   return (
     <div className="app-shell">
