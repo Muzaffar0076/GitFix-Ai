@@ -1,4 +1,4 @@
-export default function Sidebar({ activeView, onChangeView, user, onLogout }) {
+export default function Sidebar({ activeView, onChangeView, user, onLogout, darkMode, onToggleDarkMode }) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: "D" },
     { id: "settings", label: "Settings", icon: "S" },
@@ -28,7 +28,10 @@ export default function Sidebar({ activeView, onChangeView, user, onLogout }) {
       </nav>
 
       <div className="sidebar-footer">
-        <div>
+        <button className="secondary-button" onClick={onToggleDarkMode}>
+          {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+        </button>
+        <div style={{ marginTop: 8 }}>
           <div className="user-name">{user?.username || "User"}</div>
           <div className="muted">Authenticated</div>
         </div>

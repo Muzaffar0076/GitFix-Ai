@@ -1,21 +1,59 @@
 :root {
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  color: #0f172a;
-  background: #f8fafc;
+  --font-main: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  
+  /* Light Mode Colors */
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-sidebar: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --primary: #0f172a;
+  --primary-text: #ffffff;
+  --accent: #3b82f6;
+  --secondary-btn: #e2e8f0;
+  --text-link: #3b82f6;
+}
+
+.dark-mode {
+  --bg-app: #020617;
+  --bg-card: #0f172a;
+  --bg-sidebar: #0f172a;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #1e293b;
+  --primary: #f8fafc;
+  --primary-text: #020617;
+  --secondary-btn: #1e293b;
+  --text-link: #ffffff;
 }
 
 * {
   box-sizing: border-box;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 body {
   margin: 0;
+  font-family: var(--font-main);
+  color: var(--text-main);
+  background: var(--bg-app);
+}
+
+a {
+  color: var(--text-link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 .app-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
   min-height: 100vh;
+  background: var(--bg-app);
 }
 
 .content-shell {
@@ -35,12 +73,12 @@ body {
 
 .subtitle {
   margin: 0 0 24px;
-  color: #475569;
+  color: var(--text-muted);
 }
 
 .card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
@@ -56,28 +94,30 @@ input {
   flex: 1;
   min-width: 280px;
   padding: 10px 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-main);
 }
 
 button {
   padding: 6px 12px;
   border: 0;
   border-radius: 6px;
-  background: #0f172a;
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-text);
   cursor: pointer;
   font-size: 13px;
 }
 
 .secondary-button {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--secondary-btn);
+  color: var(--text-main);
 }
 
 .sidebar {
-  background: #ffffff;
-  border-right: 1px solid #e2e8f0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-color);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -99,8 +139,8 @@ button {
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: #0f172a;
-  color: #ffffff;
+  background: var(--primary);
+  color: var(--primary-text);
   font-weight: 800;
 }
 
@@ -124,13 +164,13 @@ button {
   gap: 10px;
   width: 100%;
   background: transparent;
-  color: #334155;
+  color: var(--text-muted);
   text-align: left;
 }
 
 .nav-item.active {
-  background: #0f172a;
-  color: #ffffff;
+  background: var(--primary);
+  color: var(--primary-text);
 }
 
 .nav-icon {
@@ -139,14 +179,15 @@ button {
   display: grid;
   place-items: center;
   border-radius: 6px;
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--secondary-btn);
+  color: var(--text-main);
   font-size: 12px;
   font-weight: 800;
 }
 
 .nav-item.active .nav-icon {
-  background: #ffffff;
+  background: var(--bg-card);
+  color: var(--primary);
 }
 
 .sidebar-footer {
@@ -169,8 +210,8 @@ button {
 
 .login-card {
   width: min(420px, 100%);
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 24px;
   display: grid;
@@ -187,17 +228,17 @@ button {
   gap: 8px;
   padding: 4px;
   border-radius: 8px;
-  background: #e2e8f0;
+  background: var(--secondary-btn);
 }
 
 .auth-tabs button {
   background: transparent;
-  color: #334155;
+  color: var(--text-muted);
 }
 
 .auth-tabs button.active {
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--bg-card);
+  color: var(--text-main);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 }
 
@@ -245,7 +286,7 @@ button:disabled {
 }
 
 .run-item {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 10px;
   margin-bottom: 8px;
@@ -258,7 +299,7 @@ button:disabled {
 }
 
 .muted {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 13px;
 }
 

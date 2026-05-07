@@ -10,6 +10,12 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [activeView, setActiveView] = useState("dashboard");
   const [checkingSession, setCheckingSession] = useState(Boolean(token));
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("gitfix_dark") === "true");
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-mode", darkMode);
+    localStorage.setItem("gitfix_dark", darkMode);
+  }, [darkMode]);
 
   useEffect(() => {
     if (!token) {
@@ -66,6 +72,8 @@ export default function App() {
         onChangeView={setActiveView}
         user={user}
         onLogout={handleLogout}
+        darkMode={darkMode}
+        onToggleDarkMode={() => setDarkMode(!darkMode)}
       />
       <main className="content-shell">
         {activeView === "dashboard" ? <Dashboard token={token} /> : null}
