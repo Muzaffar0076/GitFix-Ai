@@ -234,7 +234,7 @@ button:disabled {
 }
 
 .logs {
-  max-height: 280px;
+  height: 200px;
   overflow: auto;
   background: #020617;
   color: #e2e8f0;
