@@ -12,7 +12,7 @@ from app.models.db_models import User, RunLog, EventLog
 from app.models.run_log import RunStatus
 from app.models.event_log import LogLevel, AgentStage
 
-router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+router = APIRouter(prefix="/api", tags=["dashboard"])
 
 # Pydantic models for API responses (distinct from DB models)
 class EventResponse(BaseModel):
@@ -35,11 +35,12 @@ class RunResponse(BaseModel):
 class CreateRunRequest(BaseModel):
     issue_url: str
 
-def _run_pipeline_in_background(run_db_id: int, issue_url: str):
+def _run_pipeline_in_background(run_db_id: int, issue_url: str, main_loop: asyncio.AbstractEventLoop):
     """
     Background task to execute the autonomous pipeline and update DB.
     """
     from app.core.database import SessionLocal
+    from app.api.websockets.log_stream import log_stream_manager
     
     db = SessionLocal()
     try:
@@ -48,25 +49,36 @@ def _run_pipeline_in_background(run_db_id: int, issue_url: str):
         if not run:
             return
         run.status = "RUNNING"
+        run_uuid = run.run_id # Capture the UUID string
         db.commit()
 
-        # 2. Define a callback that writes to the DB
+        # 2. Define a callback that writes to the DB AND broadcasts to WebSockets
         def db_event_callback(event_obj):
-            event = EventLog(
-                run_id=run_db_id,
-                level=event_obj.level.value if hasattr(event_obj.level, "value") else str(event_obj.level),
-                stage=event_obj.stage.value if hasattr(event_obj.stage, "value") else str(event_obj.stage),
-                message=event_obj.message,
-                data=event_obj.data or {}
-            )
-            db.add(event)
-            db.commit()
+            # Save to DB
+            try:
+                event = EventLog(
+                    run_id=run_db_id,
+                    level=event_obj.level.value if hasattr(event_obj.level, "value") else str(event_obj.level),
+                    stage=event_obj.stage.value if hasattr(event_obj.stage, "value") else str(event_obj.stage),
+                    message=event_obj.message,
+                    data=event_obj.data or {}
+                )
+                db.add(event)
+                db.commit()
+            except Exception as db_err:
+                print(f"❌ DB Log Error: {db_err}")
+
+            # Broadcast to UI (WebSocket)
+            try:
+                log_stream_manager.broadcast_from_thread(main_loop, run_uuid, event_obj)
+            except Exception as ws_err:
+                print(f"❌ WS Broadcast Error: {ws_err}")
 
         # 3. Run pipeline
         from app.agent.orchestrator import run_fix_pipeline
         result_run_log = run_fix_pipeline(
             issue_url=issue_url,
-            run_id=run.run_id,
+            run_id=run_uuid,
             event_callback=db_event_callback
         )
 
@@ -85,6 +97,7 @@ def _run_pipeline_in_background(run_db_id: int, issue_url: str):
         db.commit()
 
     except Exception as e:
+        print(f"❌ Pipeline Background Error: {e}")
         run = db.get(RunLog, run_db_id)
         if run:
             run.status = "ERROR"
@@ -94,13 +107,15 @@ def _run_pipeline_in_background(run_db_id: int, issue_url: str):
     finally:
         db.close()
 
-@router.post("/runs", response_model=RunResponse)
-def create_run(
+@router.post("/fix", response_model=RunResponse)
+async def create_run(
     request: CreateRunRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
+    import asyncio
+    
     # Create the run record
     new_run = RunLog(
         issue_url=str(request.issue_url),
@@ -111,8 +126,11 @@ def create_run(
     db.commit()
     db.refresh(new_run)
 
+    # Capture the current loop (the main app loop)
+    main_loop = asyncio.get_running_loop()
+
     # Start the background task
-    background_tasks.add_task(_run_pipeline_in_background, new_run.id, new_run.issue_url)
+    background_tasks.add_task(_run_pipeline_in_background, new_run.id, new_run.issue_url, main_loop)
 
     return RunResponse(
         run_id=new_run.run_id,
