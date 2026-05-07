@@ -1,15 +1,22 @@
-from secrets import compare_digest, token_urlsafe
+from secrets import token_urlsafe
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+import bcrypt
 
 from app.core.config import get_settings
+from app.core.database import get_session
+from app.models.db_models import User
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 security = HTTPBearer(auto_error=False)
-USERS: dict[str, str] = {}
+
+# We keep ACTIVE_TOKENS in memory for now (sessions), but link them to DB users
 ACTIVE_TOKENS: dict[str, str] = {}
 
 
@@ -28,9 +35,35 @@ class LoginResponse(BaseModel):
     username: str
 
 
-def _seed_default_user() -> None:
+def hash_password(password: str) -> str:
+    """
+    Hashes a plain-text password using bcrypt.
+    """
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Verifies a plain-text password against a hashed bcrypt password.
+    """
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
+
+def _seed_default_user(session: Session) -> None:
     settings = get_settings()
-    USERS.setdefault(settings.AUTH_USERNAME, settings.AUTH_PASSWORD)
+    # Check if admin already exists
+    statement = select(User).where(User.username == settings.AUTH_USERNAME)
+    existing_user = session.execute(statement).scalar_one_or_none()
+    
+    if not existing_user:
+        admin = User(
+            username=settings.AUTH_USERNAME,
+            hashed_password=hash_password(settings.AUTH_PASSWORD)
+        )
+        session.add(admin)
+        session.commit()
 
 
 def _create_session(username: str) -> LoginResponse:
@@ -58,35 +91,65 @@ def verify_token(
 
 
 def is_valid_token(token: str | None) -> bool:
-    return bool(token and token in ACTIVE_TOKENS)
+    """
+    Checks if a token exists in ACTIVE_TOKENS.
+    Used by WebSockets where we can't easily use Depends(verify_token).
+    """
+    return token in ACTIVE_TOKENS
+
+
+def get_current_user(
+    token: str = Depends(verify_token),
+    session: Session = Depends(get_session)
+) -> User:
+    username = ACTIVE_TOKENS[token]
+    statement = select(User).where(User.username == username)
+    user = session.execute(statement).scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+    return user
 
 
 @router.post("/register", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
-def register(request: RegisterRequest) -> LoginResponse:
-    _seed_default_user()
+def register(
+    request: RegisterRequest, 
+    session: Session = Depends(get_session)
+) -> LoginResponse:
     username = request.username.strip()
 
-    if username in USERS:
+    # Check if user already exists
+    statement = select(User).where(User.username == username)
+    if session.execute(statement).scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Username already registered",
         )
 
-    USERS[username] = request.password
+    new_user = User(
+        username=username,
+        hashed_password=hash_password(request.password)
+    )
+    session.add(new_user)
+    session.commit()
+    
     return _create_session(username)
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(request: LoginRequest) -> LoginResponse:
-    _seed_default_user()
+def login(
+    request: LoginRequest, 
+    session: Session = Depends(get_session)
+) -> LoginResponse:
+    _seed_default_user(session)
     username = request.username.strip()
-    stored_password = USERS.get(username)
-    password_ok = stored_password is not None and compare_digest(
-        request.password,
-        stored_password,
-    )
+    
+    statement = select(User).where(User.username == username)
+    user = session.execute(statement).scalar_one_or_none()
 
-    if not password_ok:
+    if not user or not verify_password(request.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -96,8 +159,8 @@ def login(request: LoginRequest) -> LoginResponse:
 
 
 @router.get("/me")
-def current_user(token: str = Depends(verify_token)) -> dict[str, str]:
-    return {"username": ACTIVE_TOKENS[token]}
+def current_user_info(user: User = Depends(get_current_user)) -> dict[str, str]:
+    return {"username": user.username}
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

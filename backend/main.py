@@ -28,6 +28,8 @@ from app.api.routes.auth import router as auth_router
 from app.api.websockets.log_stream import router as log_stream_router
 from app.core.config import get_settings
 from app.core.logger import logger
+from app.core.database import init_db
+from app.models import db_models  # Required for SQLModel to discover tables
 
 
 # ── Lifespan: runs setup ONCE at startup, cleanup at shutdown ─────────────────
@@ -50,6 +52,9 @@ async def lifespan(app: FastAPI):
     # Create required directories if they don't exist yet
     os.makedirs(settings.REPOS_CLONE_PATH, exist_ok=True)
     os.makedirs(settings.CHROMA_DB_PATH, exist_ok=True)
+
+    # Initialize the SQLite database
+    init_db()
 
     logger.info("GitFix AI backend started.")
     logger.info("Repos path : %s", settings.REPOS_CLONE_PATH)
