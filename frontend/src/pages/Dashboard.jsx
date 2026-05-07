@@ -10,6 +10,7 @@ export default function Dashboard({ token }) {
   const [issueUrl, setIssueUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [runs, setRuns] = useState([]);
+  const [showAllRuns, setShowAllRuns] = useState(false);
   const [activeRunId, setActiveRunId] = useState("");
   const [liveLogs, setLiveLogs] = useState([]);
   const [error, setError] = useState("");
@@ -95,7 +96,7 @@ export default function Dashboard({ token }) {
         <div className="card">
           <h3>Runs</h3>
           {runs.length === 0 ? <p className="muted">No runs yet.</p> : null}
-          {runs.map((run) => (
+          {runs.slice(0, showAllRuns ? runs.length : 2).map((run) => (
             <div className="run-item" key={run.run_id}>
               <div>
                 <strong>{run.status}</strong> · {run.run_id.slice(0, 8)}
@@ -114,6 +115,15 @@ export default function Dashboard({ token }) {
               </div>
             </div>
           ))}
+          {runs.length > 2 && (
+            <button 
+              className="secondary-button" 
+              style={{ width: "100%", marginTop: 12 }}
+              onClick={() => setShowAllRuns(!showAllRuns)}
+            >
+              {showAllRuns ? "Show Less" : `See More (${runs.length - 2} more)`}
+            </button>
+          )}
         </div>
 
         <div className="card">
