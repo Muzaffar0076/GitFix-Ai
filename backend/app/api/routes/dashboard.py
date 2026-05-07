@@ -96,6 +96,16 @@ def _run_pipeline_in_background(run_db_id: int, issue_url: str, main_loop: async
         run.finished_at = datetime.now(timezone.utc)
         db.commit()
 
+        # 5. Notify frontend that run is complete
+        try:
+            log_stream_manager.broadcast_message_from_thread(
+                main_loop, 
+                run_uuid, 
+                {"type": "run_complete", "status": run.status}
+            )
+        except Exception as notify_err:
+            print(f"❌ Notification Error: {notify_err}")
+
     except Exception as e:
         print(f"❌ Pipeline Background Error: {e}")
         run = db.get(RunLog, run_db_id)

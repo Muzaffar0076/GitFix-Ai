@@ -49,6 +49,9 @@ class LogStreamManager:
     def broadcast_from_thread(self, loop: asyncio.AbstractEventLoop, run_id: str, event: EventLog) -> None:
         loop.call_soon_threadsafe(asyncio.create_task, self.broadcast_event(run_id, event))
 
+    def broadcast_message_from_thread(self, loop: asyncio.AbstractEventLoop, run_id: str, payload: dict) -> None:
+        loop.call_soon_threadsafe(asyncio.create_task, self.broadcast_message(run_id, payload))
+
 
 log_stream_manager = LogStreamManager()
 

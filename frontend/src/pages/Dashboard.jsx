@@ -26,6 +26,11 @@ export default function Dashboard({ token }) {
     setRuns(data);
   }
 
+  const refreshRef = useRef(refreshRuns);
+  useEffect(() => {
+    refreshRef.current = refreshRuns;
+  }, [refreshRuns]);
+
   function connectLogs(runId) {
     if (wsRef.current) {
       wsRef.current.close();
@@ -38,7 +43,10 @@ export default function Dashboard({ token }) {
       try {
         const payload = JSON.parse(event.data);
         if (payload.type === "run_complete") {
-          refreshRuns().catch(() => {});
+          // Small delay to ensure DB transaction is fully committed
+          setTimeout(() => {
+            refreshRef.current().catch(() => {});
+          }, 500);
           return;
         }
         setLiveLogs((prev) => [...prev, payload]);
