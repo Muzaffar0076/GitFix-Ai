@@ -84,11 +84,8 @@ def read_root():
 # This middleware whitelists our React dev server.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",   # Vite dev server
-        "http://localhost:3000",   # Create React App (fallback)
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],           # Allow all origins for the deployed frontend
+    allow_credentials=False,       # Must be False when allow_origins=["*"]
     allow_methods=["*"],           # GET, POST, PUT, DELETE, etc.
     allow_headers=["*"],
 )
